@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+*.key
+出力/*
+!出力/.gitkeep
+
+.pytest_cache/

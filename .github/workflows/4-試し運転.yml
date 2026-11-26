@@ -1,0 +1,47 @@
+name: 4 試し運転（手で動かす・投稿しない）
+# Actions の画面で「Run workflow」を押すと動きます。X には投稿せず、データも書き換えません。
+# 結果は、実行の画面の下の「Artifacts」から、ダウンロードして読みます。
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "どれを試すか"
+        type: choice
+        default: morning
+        options: [morning, weekly]
+      read_numbers:
+        description: "X から数字を読む（読み取りの料金が少しかかります）"
+        type: boolean
+        default: false
+permissions:
+  contents: read
+  issues: read
+jobs:
+  dry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: 試し運転
+        run: |
+          OPT=""
+          if [ "${{ inputs.read_numbers }}" != "true" ]; then OPT="--no-x"; fi
+          python -m xjido ${{ inputs.task }} --dry-run $OPT
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONPATH: src
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: 試し運転の結果
+          path: 出力/

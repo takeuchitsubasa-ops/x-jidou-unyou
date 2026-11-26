@@ -1,0 +1,58 @@
+name: 2 投稿（6:00・12:00・18:00）
+# 投稿の時刻の前後だけ、30分ごとに動きます（遅れの許容の180分まで）。
+# 最初に、シェルで「今は枠の時刻か」を判定し、枠でなければ、pip install より前に終わります。
+# cron は UTC で書く決まりです（日本時間 = UTC + 9時間）。
+#   日本時間 6:00〜8:59  → UTC 21:00〜23:59
+#   日本時間 12:00〜14:59 → UTC 3:00〜5:59
+#   日本時間 18:00〜20:59 → UTC 9:00〜11:59
+# 設定.yml の投稿の時刻を変えた時は、下の cron の時間（21-23・3-5・9-11）も、同じように直してください。
+on:
+  schedule:
+    - cron: "0,30 21-23 * * *"
+    - cron: "0,30 3-5 * * *"
+    - cron: "0,30 9-11 * * *"
+  workflow_dispatch:
+permissions:
+  contents: write
+  issues: write
+concurrency:
+  group: x-jidou-unyou
+  cancel-in-progress: false
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: 今は投稿の枠か（枠でなければ、ここで終わります）
+        id: gate
+        run: python3 .github/scripts/slot_gate.py
+      - uses: actions/setup-python@v5
+        if: steps.gate.outputs.go == 'true'
+        with:
+          python-version: "3.11"
+          cache: pip
+      - if: steps.gate.outputs.go == 'true'
+        run: pip install -r requirements.txt
+      - name: 投稿
+        if: steps.gate.outputs.go == 'true'
+        run: python -m xjido post
+        env:
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_TOKEN_SECRET: ${{ secrets.X_ACCESS_TOKEN_SECRET }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PYTHONPATH: src
+      - name: 記録を保存する（data/ メモリ/）
+        if: always() && steps.gate.outputs.go == 'true'
+        run: |
+          git config user.name "x-jidou-unyou"
+          git config user.email "actions@users.noreply.github.com"
+          git add data メモリ
+          if git diff --cached --quiet; then echo "保存する変更はありません"; else
+            git commit -m "自動：記録の更新"
+            git pull --rebase
+            git push
+          fi

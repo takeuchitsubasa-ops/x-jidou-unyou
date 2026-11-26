@@ -1,0 +1,5 @@
+anthropic>=2.0
+requests>=2.32
+requests-oauthlib>=2.0
+pyyaml>=6.0
+pytest>=8.0
